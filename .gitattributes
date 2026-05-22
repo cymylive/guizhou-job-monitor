@@ -1,0 +1,4 @@
+*.md text encoding=UTF-8
+*.py text encoding=UTF-8
+*.json text encoding=UTF-8
+*.yml text encoding=UTF-8
