@@ -1,0 +1,32 @@
+# 忽略所有非监控相关文件
+node_modules/
+.local/
+.data/
+.opencode-lark/
+feishu-bot/
+data/
+skills/
+.clawhub/
+.learnings/
+.config/
+ai-daily/
+
+# 环境/缓存
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.db-shm
+*.db-wal
+
+# 本地配置
+opencode.exe
+opencode.ps1
+opencode.bat
+start-feishu.ps1
+start-feishu.bat
+CLAUDE.md
+待办招聘.txt
+setup_job_monitor.bat
+setup_job_monitor.ps1
