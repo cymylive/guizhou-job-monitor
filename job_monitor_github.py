@@ -12,17 +12,40 @@ if not DINGTALK_TOKEN:
     exit(1)
 DINGTALK_WEBHOOK = f"https://oapi.dingtalk.com/robot/send?access_token={DINGTALK_TOKEN}"
 
-MATCH_RULES = {
-    "排除_keywords": ["2年以上", "3年以上", "5年以上", "8年以上", "10年以上",
-                       "中共党员", "高级职称", "中级职称", "中级会计师",
-                       "法律职业资格", "一级建造师", "一级注册", "注册土木",
-                       "土木工程", "安全工程", "食品科学与工程",
-                       "研发", "开发", "工程师", "技术员", "医师", "护理",
-                       "总经理", "副总经理", "部长", "总监", "负责人", "经理岗"],
-    "专业_keywords": ["经济", "金融", "管理", "财务", "会计", "审计", "不限专业", "专业不限",
-                       "运营", "行政", "综合", "办公", "市场", "营销", "人力", "人事"],
-    "地点_优先": ["贵阳", "安顺", "平坝", "遵义"],
-}
+# ===== 从 config.json 加载配置 =====
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+def load_config():
+    default = {
+        "排除条件": {
+            "经验要求": ["2年以上", "3年以上", "5年以上", "8年以上", "10年以上"],
+            "硬性要求": ["中共党员", "高级职称", "中级职称", "中级会计师",
+                         "法律职业资格", "注册会计师", "一级建造师", "一级注册", "注册土木"],
+            "特定专业": ["土木工程", "安全工程", "食品科学与工程"],
+            "岗位排除": ["研发", "开发", "工程师", "技术员", "医师", "护理",
+                         "总经理", "副总经理", "部长", "总监", "负责人", "经理岗"]
+        },
+        "包含条件": {
+            "专业关键词": ["经济", "金融", "管理", "财务", "会计", "审计",
+                           "不限专业", "专业不限", "运营", "行政", "综合",
+                           "办公", "市场", "营销", "人力", "人事"],
+            "特殊岗位": ["见习", "管培", "应届"]
+        },
+        "求职者信息": {"期望城市": ["贵阳", "安顺", "平坝", "遵义"]}
+    }
+    try:
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except:
+        pass
+    return default
+
+CONFIG = load_config()
+EXCLUDE_KW = (CONFIG["排除条件"]["经验要求"] + CONFIG["排除条件"]["硬性要求"]
+              + CONFIG["排除条件"]["特定专业"] + CONFIG["排除条件"]["岗位排除"])
+MAJOR_KW = CONFIG["包含条件"]["专业关键词"]
+CITIES = CONFIG["求职者信息"]["期望城市"]
+SCHOOL_JOBS = CONFIG["包含条件"]["特殊岗位"]
 
 def decode(raw):
     for enc in ["utf-8", "gbk", "gb2312"]:
@@ -93,29 +116,19 @@ def fetch_detail(url):
 def rough_match(job):
     """粗筛：基于标题"""
     t = job.get("title", "") + " " + job.get("type", "")
-    for kw in MATCH_RULES["排除_keywords"]:
+    for kw in EXCLUDE_KW:
         if kw in t: return False
-    loc = any(x in t for x in MATCH_RULES["地点_优先"])
-    maj = any(x in t for x in MATCH_RULES["专业_keywords"])
-    sch = "见习" in t or "管培" in t or "应届" in t
+    loc = any(x in t for x in CITIES)
+    maj = any(x in t for x in MAJOR_KW)
+    sch = any(x in t for x in SCHOOL_JOBS)
     st = job.get("type") in ["国企", "事业编", "合同制"]
     return (st or sch) and (maj or loc)
 
 def match_detail(info, job):
     """精筛：基于详情页"""
-    t = job.get("title", "") + " " + job.get("type", "")
-    body = info.get("body", "")
-    full_text = t + body
-    
-    # 排除: 经验要求
-    for kw in ["2年以上", "3年以上", "5年以上", "8年以上", "10年以上"]:
+    full_text = job.get("title", "") + info.get("body", "")
+    for kw in EXCLUDE_KW + ["中级及以上", "中级会计", "注册会计师"]:
         if kw in full_text: return False
-    
-    # 排除: 中级职称等
-    for kw in ["中级及以上", "中级会计", "中级职称", "高级职称",
-               "注册会计师", "注册会计", "法律职业资格"]:
-        if kw in full_text: return False
-    
     return True
 
 def send_dingtalk(text):
